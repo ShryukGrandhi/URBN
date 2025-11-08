@@ -676,6 +676,51 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
             <div className="text-2xl">💥</div>
           </div>
         </button>
+
+        {/* TEST DEMO BUTTON */}
+        <button
+          onClick={() => {
+            if (!map.current) return;
+            
+            alert('🎬 WATCH ALL BUILDINGS DISAPPEAR!\n\nOver the next 10 seconds:\n• Buildings will fade out\n• Buildings will shrink down\n• All 3D structures will vanish\n\nWatch the map closely!');
+            
+            let opacity = 1;
+            const interval = setInterval(() => {
+              opacity -= 0.1;
+              
+              if (opacity <= 0) {
+                clearInterval(interval);
+                
+                // Explosion effect
+                alert('💥 BOOM! All buildings gone!\n\nRefresh page to restore them.');
+                
+                if (map.current?.getLayer('3d-buildings')) {
+                  map.current.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', 0);
+                  map.current.setPaintProperty('3d-buildings', 'fill-extrusion-height', 0);
+                }
+              } else {
+                if (map.current?.getLayer('3d-buildings')) {
+                  map.current.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', opacity);
+                  map.current.setPaintProperty('3d-buildings', 'fill-extrusion-height', [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    15, 0,
+                    15.05,
+                    ['*', ['get', 'height'], opacity]
+                  ]);
+                }
+              }
+            }, 1000);
+          }}
+          className="group relative"
+          title="TEST: Make ALL buildings disappear"
+        >
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition animate-pulse"></div>
+          <div className="relative bg-black/90 backdrop-blur-2xl border border-white/30 rounded-xl px-4 py-3 hover:scale-105 transition-transform shadow-xl">
+            <div className="text-2xl">🎬</div>
+          </div>
+        </button>
       </div>
       
       {/* Detailed Analysis Console */}
