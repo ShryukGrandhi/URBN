@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
+import { Activity } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -17,6 +18,8 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
   const [mapLoaded, setMapLoaded] = useState(false);
   const [constructionMarkers, setConstructionMarkers] = useState<mapboxgl.Marker[]>([]);
   const [publicSentiment, setPublicSentiment] = useState<any[]>([]);
+  const [is3D, setIs3D] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(true);
 
   // Initialize map
   useEffect(() => {
@@ -271,6 +274,138 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
 
   }, [simulationData, mapLoaded, simulationId]);
 
+  // Toggle 3D/2D view
+  const toggle3D = () => {
+    if (!map.current) return;
+    
+    if (is3D) {
+      // Switch to 2D
+      map.current.easeTo({
+        pitch: 0,
+        bearing: 0,
+        duration: 1000
+      });
+    } else {
+      // Switch to 3D
+      map.current.easeTo({
+        pitch: 70,
+        bearing: -17,
+        duration: 1000
+      });
+    }
+    setIs3D(!is3D);
+  };
+
+  // STUNNING HEATMAP OVERLAYS - AI-DRIVEN IMPACT ZONES
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !simulationData?.metrics || !showHeatmap) return;
+
+    const center = map.current.getCenter();
+    
+    // Remove existing heatmap layers
+    ['heatmap-outer', 'heatmap-middle', 'heatmap-inner', 'heatmap-core', 'policy-maker-zone'].forEach(id => {
+      if (map.current?.getLayer(id)) {
+        map.current?.removeLayer(id);
+      }
+    });
+
+    if (map.current?.getSource('heatmap-source')) {
+      map.current?.removeSource('heatmap-source');
+    }
+
+    // Create concentric heatmap zones based on policy impact
+    const changes = simulationData.metrics.changes || {};
+    const avgImpact = Object.values(changes).reduce((sum: number, c: any) => sum + Math.abs(c.percentage || 0), 0) / Object.keys(changes).length;
+
+    // Determine colors based on overall impact
+    const isPositive = Object.values(changes).filter((c: any) => (c.percentage || 0) > 0).length > Object.values(changes).length / 2;
+    
+    const colors = isPositive 
+      ? ['#22c55e', '#84cc16', '#fbbf24', '#fb923c']  // Green to orange (positive)
+      : ['#ef4444', '#f97316', '#fbbf24', '#84cc16']; // Red to yellow (negative)
+
+    // Create multiple impact zones (like ripples)
+    const zones = [
+      { radius: 2000, opacity: 0.15, color: colors[0], label: 'Core Impact Zone' },
+      { radius: 1500, opacity: 0.25, color: colors[1], label: 'Primary Zone' },
+      { radius: 1000, opacity: 0.35, color: colors[2], label: 'Secondary Zone' },
+      { radius: 500, opacity: 0.45, color: colors[3], label: 'Direct Impact' },
+    ];
+
+    map.current.addSource('heatmap-source', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: zones.map((zone, i) => ({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [center.lng, center.lat]
+          },
+          properties: {
+            radius: zone.radius,
+            color: zone.color,
+            opacity: zone.opacity,
+            label: zone.label
+          }
+        }))
+      }
+    });
+
+    // Add heatmap layers (outer to inner for proper stacking)
+    zones.reverse().forEach((zone, i) => {
+      map.current!.addLayer({
+        id: `heatmap-${i}`,
+        type: 'circle',
+        source: 'heatmap-source',
+        filter: ['==', ['get', 'radius'], zone.radius],
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, zone.radius / 20,
+            16, zone.radius / 3,
+            20, zone.radius
+          ],
+          'circle-color': zone.color,
+          'circle-opacity': zone.opacity,
+          'circle-blur': 1
+        }
+      });
+    });
+
+    // Add POLICY MAKER ATTRIBUTION ZONE (who made this policy)
+    if (simulationData.policyMaker || simulationData.source) {
+      const policyMaker = simulationData.policyMaker || 'City Council';
+      
+      const makerEl = document.createElement('div');
+      makerEl.innerHTML = `
+        <div class="relative group">
+          <div class="absolute -inset-2 bg-purple-500 rounded-2xl blur-xl opacity-60 animate-pulse"></div>
+          <div class="relative bg-black/90 backdrop-blur-xl border-2 border-purple-400/50 rounded-2xl px-6 py-3 shadow-2xl">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-xl">
+                🏛️
+              </div>
+              <div>
+                <p class="text-purple-300 text-xs font-bold uppercase tracking-wide">Policy by</p>
+                <p class="text-white font-bold">${policyMaker}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const makerMarker = new mapboxgl.Marker(makerEl)
+        .setLngLat([center.lng, center.lat + 0.01])
+        .addTo(map.current!);
+
+      setConstructionMarkers(prev => [...prev, makerMarker]);
+    }
+
+  }, [simulationData, mapLoaded, showHeatmap]);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="flex items-center justify-center h-full bg-red-900">
@@ -286,13 +421,50 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="absolute inset-0" />
       
+      {/* 3D/2D Toggle Button */}
+      <div className="absolute top-8 right-8 z-20 space-y-4">
+        <button
+          onClick={toggle3D}
+          className="group relative"
+        >
+          <div className={`absolute -inset-1 bg-gradient-to-r ${is3D ? 'from-blue-600 to-cyan-600' : 'from-purple-600 to-pink-600'} rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition`}></div>
+          <div className="relative bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl px-6 py-4 flex items-center gap-3">
+            <div className="text-2xl">{is3D ? '🗺️' : '🏙️'}</div>
+            <div>
+              <p className="text-white font-bold text-lg">{is3D ? '3D View' : '2D View'}</p>
+              <p className="text-white/60 text-xs">Click to toggle</p>
+            </div>
+          </div>
+        </button>
+
+        {/* Heatmap Toggle */}
+        {simulationData && (
+          <button
+            onClick={() => setShowHeatmap(!showHeatmap)}
+            className="group relative"
+          >
+            <div className={`absolute -inset-1 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition`}></div>
+            <div className="relative bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl px-6 py-4 flex items-center gap-3">
+              <div className="text-2xl">🔥</div>
+              <div>
+                <p className="text-white font-bold text-lg">Heatmap</p>
+                <p className="text-white/60 text-xs">{showHeatmap ? 'ON' : 'OFF'}</p>
+              </div>
+            </div>
+          </button>
+        )}
+      </div>
+      
       {/* Simulation Legend */}
       {simulationData && (
         <div className="absolute bottom-8 left-8 z-10">
           <div className="relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur-xl opacity-75"></div>
             <div className="relative bg-black/90 backdrop-blur-2xl border border-white/20 rounded-2xl p-4">
-              <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wide">Map Legend</h4>
+              <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wide flex items-center gap-2">
+                <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-yellow-400 rounded-full animate-pulse"></div>
+                Impact Zones
+              </h4>
               <div className="space-y-2 text-xs">
                 <div className="flex items-center gap-2">
                   <div className="text-xl">🏗️</div>
@@ -310,6 +482,29 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
                   <div className="text-xl">😊</div>
                   <span className="text-white/80">Public Sentiment</span>
                 </div>
+                {showHeatmap && (
+                  <>
+                    <div className="border-t border-white/20 my-2 pt-2">
+                      <p className="text-white/60 font-bold mb-2">HEATMAP ZONES:</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-green-500"></div>
+                      <span className="text-white/80">Strong Impact</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-lime-500"></div>
+                      <span className="text-white/80">Medium Impact</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
+                      <span className="text-white/80">Low Impact</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-orange-500"></div>
+                      <span className="text-white/80">Minimal Effect</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
