@@ -354,9 +354,9 @@ export default function UnifiedApp() {
           />
         </div>
 
-        {/* Live Simulation Feed - RIGHT SIDE */}
+        {/* Live Simulation Feed - TOP LEFT */}
         {runningSimulation && (
-          <div className="absolute top-8 right-8 z-20 w-96">
+          <div className="absolute top-8 left-8 z-20 w-96">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-green-600 via-emerald-600 to-cyan-600 rounded-3xl blur-xl opacity-75 animate-pulse"></div>
               <div className="relative bg-black/90 backdrop-blur-3xl border border-white/30 rounded-3xl p-6">
