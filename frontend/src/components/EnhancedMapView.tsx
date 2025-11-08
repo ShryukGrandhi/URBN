@@ -22,15 +22,15 @@ export function EnhancedMapView({ city, layers, simulationData }: EnhancedMapVie
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/standard',  // BEST 3D STYLE - ultra realistic!
+      style: 'mapbox://styles/mapbox/standard',  // STANDARD - BEST 3D BUILDINGS!
       center: [-122.4194, 37.7749], // SF default
-      zoom: 14.5,
-      pitch: 60,
-      bearing: 0,
+      zoom: 16,  // Closer for better building detail
+      pitch: 70,  // Steeper angle to see buildings better
+      bearing: -17,
       antialias: true,
     });
 
-    // Standard style has built-in realistic lighting and atmosphere!
+    // STANDARD STYLE - PHOTOREALISTIC 3D BUILDINGS!
 
     // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -41,7 +41,7 @@ export function EnhancedMapView({ city, layers, simulationData }: EnhancedMapVie
       
       if (!map.current) return;
 
-      // Standard style has built-in realistic 3D buildings - no custom layer needed!
+      // Standard style has BUILT-IN photorealistic 3D buildings with textures!
 
       // Add VIBRANT traffic layer with glow
       if (layers.includes('traffic')) {
@@ -92,7 +92,7 @@ export function EnhancedMapView({ city, layers, simulationData }: EnhancedMapVie
         });
       }
 
-      // Standard style has built-in optimized labels - perfect balance!
+      // Standard style has built-in optimized labels!
     });
 
     return () => {
@@ -162,7 +162,7 @@ export function EnhancedMapView({ city, layers, simulationData }: EnhancedMapVie
           </h4>
           <div className="space-y-4">
             {[
-              { id: 'buildings', label: '3D Buildings', colors: ['#ffffff', '#e0e0e0'], emoji: '🏢', enabled: true },  // Always on in Standard style
+              { id: 'buildings', label: '3D Buildings', colors: ['#ffffff', '#e0e0e0'], emoji: '🏢', enabled: true },  // Always on in Standard
               { id: 'traffic', label: 'Live Traffic', colors: ['#10b981', '#ef4444'], emoji: '🚗', enabled: layers.includes('traffic') },
               { id: 'housing', label: 'Housing', colors: ['#3b82f6', '#06b6d4'], emoji: '🏠', enabled: layers.includes('housing') },
               { id: 'emissions', label: 'Air Quality', colors: ['#22c55e', '#84cc16'], emoji: '🌱', enabled: layers.includes('emissions') },
