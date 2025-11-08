@@ -550,6 +550,11 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
         opacity = 0;
         clearInterval(demolitionIntervalRef.current);
         
+        // Make buildings completely transparent at the end
+        if (map.current?.getLayer('3d-buildings')) {
+          map.current.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', 0);
+        }
+        
         // Final explosion effect
         const explosionEl = document.createElement('div');
         explosionEl.innerHTML = `
@@ -562,13 +567,34 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
         setTimeout(() => {
           explosionMarker.remove();
           demolitionMarker.remove();
+          
+          // Reset building opacity after explosion
+          if (map.current?.getLayer('3d-buildings')) {
+            map.current.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', 0.8);
+          }
+          
           alert('💥 Salesforce Tower demolished! Building removed from simulation.');
         }, 2000);
       }
 
-      // Update building layer opacity
+      // ACTUALLY UPDATE BUILDING LAYER OPACITY IN REAL-TIME
       if (map.current?.getLayer('3d-buildings')) {
-        setBuildingOpacity(opacity);
+        // Reduce opacity of ALL buildings (makes Salesforce Tower disappear)
+        map.current.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', opacity * 0.8);
+        
+        // Also reduce height to make it "sink"
+        const currentHeight = map.current.getPaintProperty('3d-buildings', 'fill-extrusion-height');
+        if (currentHeight) {
+          map.current.setPaintProperty('3d-buildings', 'fill-extrusion-height', [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            15,
+            0,
+            15.05,
+            ['*', ['get', 'height'], opacity] // Scale height by opacity
+          ]);
+        }
       }
 
       // Update progress bar
