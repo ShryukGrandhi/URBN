@@ -5,7 +5,7 @@ import {
   Activity, TrendingUp, FileText, MessageSquare, BarChart3
 } from 'lucide-react';
 import { DynamicSimulationMap } from '../components/DynamicSimulationMap';
-import { ChatWithMap } from '../components/ChatWithMap';
+import { MapChatSidebar } from '../components/MapChatSidebar';
 import { CreateProjectModal } from '../components/CreateProjectModal';
 import { CreateAgentModal } from '../components/CreateAgentModal';
 import { AddAgentModal } from '../components/AddAgentModal';
@@ -98,6 +98,7 @@ export default function UnifiedApp() {
 
   const handleMapCommand = (command: any) => {
     console.log('🗺️ Map command received:', command);
+    console.log('📋 Command details:', command);
     
     // Create instant visual update based on command
     const instantUpdate: any = {
@@ -107,6 +108,51 @@ export default function UnifiedApp() {
     };
 
     switch (command.type) {
+      case 'build-specific':
+        // Build a specific new building
+        instantUpdate.metrics.changes.housingAffordability = {
+          percentage: command.height / 5, // Taller = more impact
+          description: `Building ${command.height}-story tower at ${command.location}`
+        };
+        instantUpdate.buildCommand = {
+          type: 'new-building',
+          height: command.height,
+          location: command.location,
+          units: command.units
+        };
+        instantUpdate.chatCommand = command;
+        break;
+      
+      case 'demolish-specific':
+        // Demolish specific building (Salesforce Tower)
+        instantUpdate.metrics.changes.demolition = {
+          percentage: -100,
+          description: `Demolishing ${command.target}`
+        };
+        instantUpdate.demolishCommand = {
+          type: 'specific-building',
+          target: command.target,
+          coordinates: command.coordinates
+        };
+        instantUpdate.triggerDemolition = true;
+        instantUpdate.chatCommand = command;
+        break;
+      
+      case 'demolish-area':
+        // Demolish entire area
+        instantUpdate.metrics.changes.demolition = {
+          percentage: -80,
+          description: `Mass demolition in ${command.area || command.target}`
+        };
+        instantUpdate.demolishCommand = {
+          type: 'area',
+          area: command.area,
+          coordinates: command.coordinates
+        };
+        instantUpdate.triggerDemolition = true;
+        instantUpdate.chatCommand = command;
+        break;
+      
       case 'add-housing':
         instantUpdate.metrics.changes.housingAffordability = {
           percentage: command.impact || 15,
@@ -115,10 +161,11 @@ export default function UnifiedApp() {
         instantUpdate.chatCommand = command;
         break;
       
+      case 'analyze-traffic':
       case 'highlight-roads':
         instantUpdate.metrics.changes.trafficFlow = {
           percentage: 10,
-          description: `Analyzing ${command.target}`
+          description: `Analyzing traffic on ${command.street || command.target}`
         };
         instantUpdate.chatCommand = command;
         break;
@@ -129,16 +176,6 @@ export default function UnifiedApp() {
           description: `Highlighting ${command.location}`
         };
         instantUpdate.chatCommand = command;
-        break;
-      
-      case 'demolish-salesforce':
-        // Trigger Salesforce Tower demolition animation
-        instantUpdate.metrics.changes.demolition = {
-          percentage: -100,
-          description: `Demolishing ${command.building}`
-        };
-        instantUpdate.chatCommand = command;
-        instantUpdate.triggerDemolition = true;
         break;
       
       case 'show-heatmap':
@@ -155,9 +192,6 @@ export default function UnifiedApp() {
     // Update map with chat-driven results
     setSimulationResults(instantUpdate);
     setChatMapCommands(prev => [...prev, command]);
-    
-    // Scroll to map to see changes
-    scrollToSection('map');
   };
 
   const testVisualEffects = () => {
@@ -345,7 +379,10 @@ export default function UnifiedApp() {
 
       {/* SECTION 2: FULL-SCREEN MAP */}
       <section id="map" className="relative h-screen">
-        <div className="absolute inset-0">
+        {/* Map AI Chat Sidebar - LEFT SIDE */}
+        <MapChatSidebar onMapCommand={handleMapCommand} />
+        
+        <div className="absolute inset-0 left-[400px]">
           <DynamicSimulationMap
             city={city}
             simulationData={simulationResults}
@@ -354,9 +391,9 @@ export default function UnifiedApp() {
           />
         </div>
 
-        {/* Live Simulation Feed - TOP LEFT */}
+        {/* Live Simulation Feed - TOP CENTER (above chat sidebar) */}
         {runningSimulation && (
-          <div className="absolute top-8 left-8 z-20 w-96">
+          <div className="absolute top-8 left-[420px] z-20 w-96">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-green-600 via-emerald-600 to-cyan-600 rounded-3xl blur-xl opacity-75 animate-pulse"></div>
               <div className="relative bg-black/90 backdrop-blur-3xl border border-white/30 rounded-3xl p-6">
@@ -696,11 +733,6 @@ export default function UnifiedApp() {
         />
       )}
 
-      {/* Chat with Map - Always Available */}
-      <ChatWithMap
-        onMapCommand={handleMapCommand}
-        simulationRunning={!!runningSimulation}
-      />
     </div>
   );
 }
