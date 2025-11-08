@@ -131,6 +131,16 @@ export default function UnifiedApp() {
         instantUpdate.chatCommand = command;
         break;
       
+      case 'demolish-salesforce':
+        // Trigger Salesforce Tower demolition animation
+        instantUpdate.metrics.changes.demolition = {
+          percentage: -100,
+          description: `Demolishing ${command.building}`
+        };
+        instantUpdate.chatCommand = command;
+        instantUpdate.triggerDemolition = true;
+        break;
+      
       case 'show-heatmap':
         // Just refresh the current data to trigger heatmap
         if (simulationResults) {
@@ -422,50 +432,7 @@ export default function UnifiedApp() {
           </div>
         )}
 
-        {/* Floating Controls */}
-        <div className="absolute top-8 left-8 z-20 space-y-4">
-          <div className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur-xl opacity-75"></div>
-            <div className="relative bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl p-6">
-              <h3 className="text-white font-bold text-xl mb-4 flex items-center gap-3">
-                <MapPin className="w-6 h-6 text-purple-400" />
-                Location
-              </h3>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-80 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-                placeholder="Enter city..."
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur-xl opacity-75"></div>
-            <div className="relative bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl p-6">
-              <h3 className="text-white font-bold text-xl mb-4">🎬 Live Simulation</h3>
-              <div className="space-y-3 text-white/80 text-sm">
-                <p className="flex items-center gap-2">
-                  <span className="text-xl">🏗️</span>
-                  New buildings appear
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="text-xl">💥</span>
-                  Demolitions marked
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="text-xl">🛣️</span>
-                  New roads drawn
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="text-xl">😊</span>
-                  Public reactions
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* DECLUTTERED - No left controls */}
 
         {/* Scroll to Next */}
         <button

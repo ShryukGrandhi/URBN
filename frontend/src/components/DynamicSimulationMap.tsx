@@ -11,6 +11,7 @@ interface DynamicSimulationMapProps {
   simulationData: any;
   messages: any[];
   simulationId: string | null;
+  onDemolitionComplete?: () => void;
 }
 
 export function DynamicSimulationMap({ city, simulationData, messages, simulationId }: DynamicSimulationMapProps) {
@@ -22,6 +23,8 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
   const [is3D, setIs3D] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [heatmapStyle, setHeatmapStyle] = useState<'concentric' | 'radius'>('concentric');
+  const [buildingOpacity, setBuildingOpacity] = useState(1);
+  const demolitionIntervalRef = useRef<any>(null);
 
   // Initialize map
   useEffect(() => {
@@ -450,6 +453,13 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
 
   }, [simulationData, mapLoaded, showHeatmap, heatmapStyle]);
 
+  // Trigger demolition when chat command received
+  useEffect(() => {
+    if (simulationData?.triggerDemolition) {
+      demolishSalesforceTower();
+    }
+  }, [simulationData?.triggerDemolition]);
+
   // Zoom to specific location
   const zoomToLocation = (location: { lng: number; lat: number; zoom: number; label: string }) => {
     if (!map.current) return;
@@ -479,6 +489,97 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
     setTimeout(() => marker.remove(), 3000);
   };
 
+  // DEMOLISH SALESFORCE TOWER - Slow disappear animation
+  const demolishSalesforceTower = () => {
+    if (!map.current) return;
+
+    // Salesforce Tower coordinates
+    const salesforceCoords: [number, number] = [-122.3970, 37.7897];
+
+    // Fly to Salesforce Tower
+    map.current.flyTo({
+      center: salesforceCoords,
+      zoom: 18,
+      pitch: 70,
+      bearing: 45,
+      duration: 3000
+    });
+
+    // Add demolition marker
+    const demolitionEl = document.createElement('div');
+    demolitionEl.innerHTML = `
+      <div class="relative">
+        <div class="absolute -inset-4 bg-red-500 rounded-full blur-2xl opacity-60 animate-pulse"></div>
+        <div class="relative w-20 h-20 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-2xl text-4xl animate-bounce">
+          💥
+        </div>
+      </div>
+    `;
+
+    const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+      <div class="p-4 bg-black/95 rounded-xl border border-red-500/50">
+        <h4 class="font-bold text-red-400 text-lg mb-2">🏢 Salesforce Tower</h4>
+        <p class="text-white/90 text-sm mb-2">Demolition in progress...</p>
+        <div class="h-2 bg-black/60 rounded-full overflow-hidden">
+          <div id="demo-progress" class="h-full bg-gradient-to-r from-red-500 to-orange-500 transition-all duration-500" style="width: 0%"></div>
+        </div>
+        <p class="text-red-300 text-xs mt-2">Building opacity decreasing...</p>
+      </div>
+    `);
+
+    const demolitionMarker = new mapboxgl.Marker(demolitionEl)
+      .setLngLat(salesforceCoords)
+      .setPopup(popup)
+      .addTo(map.current!);
+
+    demolitionMarker.togglePopup();
+
+    // Slowly reduce building opacity (10 second animation)
+    let opacity = 1;
+    let progress = 0;
+    
+    if (demolitionIntervalRef.current) {
+      clearInterval(demolitionIntervalRef.current);
+    }
+
+    demolitionIntervalRef.current = setInterval(() => {
+      opacity -= 0.05; // Reduce by 5% every 500ms
+      progress += 5;
+
+      if (opacity <= 0) {
+        opacity = 0;
+        clearInterval(demolitionIntervalRef.current);
+        
+        // Final explosion effect
+        const explosionEl = document.createElement('div');
+        explosionEl.innerHTML = `
+          <div class="w-40 h-40 bg-red-500 rounded-full opacity-75 animate-ping"></div>
+        `;
+        const explosionMarker = new mapboxgl.Marker(explosionEl)
+          .setLngLat(salesforceCoords)
+          .addTo(map.current!);
+        
+        setTimeout(() => {
+          explosionMarker.remove();
+          demolitionMarker.remove();
+          alert('💥 Salesforce Tower demolished! Building removed from simulation.');
+        }, 2000);
+      }
+
+      // Update building layer opacity
+      if (map.current?.getLayer('3d-buildings')) {
+        setBuildingOpacity(opacity);
+      }
+
+      // Update progress bar
+      const progressBar = document.getElementById('demo-progress');
+      if (progressBar) {
+        progressBar.style.width = `${progress}%`;
+      }
+
+    }, 500); // Update every 500ms for smooth animation
+  };
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="flex items-center justify-center h-full bg-red-900">
@@ -494,61 +595,61 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="absolute inset-0" />
       
-      {/* 3D/2D Toggle Button - ALWAYS VISIBLE */}
-      <div className="absolute top-8 right-8 z-20 space-y-4">
+      {/* COMPACT CONTROLS - Top Right */}
+      <div className="absolute top-6 right-6 z-20 flex gap-3">
+        {/* 3D/2D Toggle - Compact */}
         <button
           onClick={toggle3D}
           className="group relative"
+          title={is3D ? "Switch to 2D" : "Switch to 3D"}
         >
-          <div className={`absolute -inset-1 bg-gradient-to-r ${is3D ? 'from-blue-600 to-cyan-600' : 'from-purple-600 to-pink-600'} rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition`}></div>
-          <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
-            <div className="text-3xl">{is3D ? '🏙️' : '🗺️'}</div>
-            <div>
-              <p className="text-white font-bold text-lg">{is3D ? '3D View' : '2D View'}</p>
-              <p className="text-white/60 text-xs">Click to switch</p>
-            </div>
+          <div className={`absolute -inset-0.5 bg-gradient-to-r ${is3D ? 'from-blue-600 to-cyan-600' : 'from-purple-600 to-pink-600'} rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition`}></div>
+          <div className="relative bg-black/90 backdrop-blur-2xl border border-white/30 rounded-xl px-4 py-3 hover:scale-105 transition-transform shadow-xl">
+            <div className="text-2xl">{is3D ? '🏙️' : '🗺️'}</div>
           </div>
         </button>
 
-        {/* Heatmap Toggle - Shows during simulation */}
+        {/* Heatmap Toggle - Compact */}
         {simulationData && (
           <>
             <button
               onClick={() => setShowHeatmap(!showHeatmap)}
               className="group relative"
+              title={showHeatmap ? "Hide Heatmap" : "Show Heatmap"}
             >
-              <div className={`absolute -inset-1 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition animate-pulse`}></div>
-              <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
-                <div className="text-3xl">🔥</div>
-                <div>
-                  <p className="text-white font-bold text-lg">Heatmap</p>
-                  <p className={`text-xs font-bold ${showHeatmap ? 'text-green-400' : 'text-red-400'}`}>
-                    {showHeatmap ? '✅ ON' : '❌ OFF'}
-                  </p>
-                </div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition"></div>
+              <div className="relative bg-black/90 backdrop-blur-2xl border border-white/30 rounded-xl px-4 py-3 hover:scale-105 transition-transform shadow-xl">
+                <div className="text-2xl">{showHeatmap ? '🔥' : '❄️'}</div>
               </div>
             </button>
 
-            {/* Heatmap Style Toggle */}
+            {/* Style Toggle - Compact */}
             {showHeatmap && (
               <button
                 onClick={() => setHeatmapStyle(heatmapStyle === 'concentric' ? 'radius' : 'concentric')}
                 className="group relative"
+                title={heatmapStyle === 'concentric' ? "Switch to Gradient" : "Switch to Circles"}
               >
-                <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition"></div>
-                <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
-                  <div className="text-3xl">{heatmapStyle === 'concentric' ? '⭕' : '🌊'}</div>
-                  <div>
-                    <p className="text-white font-bold text-lg">Style</p>
-                    <p className="text-white/60 text-xs">
-                      {heatmapStyle === 'concentric' ? 'Circles' : 'Gradient'}
-                    </p>
-                  </div>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition"></div>
+                <div className="relative bg-black/90 backdrop-blur-2xl border border-white/30 rounded-xl px-4 py-3 hover:scale-105 transition-transform shadow-xl">
+                  <div className="text-2xl">{heatmapStyle === 'concentric' ? '⭕' : '🌊'}</div>
                 </div>
               </button>
             )}
           </>
         )}
+
+        {/* DEMOLISH BUTTON */}
+        <button
+          onClick={demolishSalesforceTower}
+          className="group relative"
+          title="Demolish Salesforce Tower"
+        >
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition animate-pulse"></div>
+          <div className="relative bg-black/90 backdrop-blur-2xl border border-white/30 rounded-xl px-4 py-3 hover:scale-105 transition-transform shadow-xl">
+            <div className="text-2xl">💥</div>
+          </div>
+        </button>
       </div>
       
       {/* Detailed Analysis Console */}
@@ -559,61 +660,7 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
         />
       )}
       
-      {/* Simulation Legend */}
-      {simulationData && (
-        <div className="absolute bottom-8 left-8 z-10">
-          <div className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur-xl opacity-75"></div>
-            <div className="relative bg-black/90 backdrop-blur-2xl border border-white/20 rounded-2xl p-4">
-              <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wide flex items-center gap-2">
-                <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-yellow-400 rounded-full animate-pulse"></div>
-                Impact Zones
-              </h4>
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="text-xl">🏗️</div>
-                  <span className="text-white/80">New Construction</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-xl">💥</div>
-                  <span className="text-white/80">Demolition</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-xl">🛣️</div>
-                  <span className="text-white/80">New Roads</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-xl">😊</div>
-                  <span className="text-white/80">Public Sentiment</span>
-                </div>
-                {showHeatmap && (
-                  <>
-                    <div className="border-t border-white/20 my-2 pt-2">
-                      <p className="text-white/60 font-bold mb-2">HEATMAP ZONES:</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                      <span className="text-white/80">Strong Impact</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-lime-500"></div>
-                      <span className="text-white/80">Medium Impact</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-                      <span className="text-white/80">Low Impact</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-orange-500"></div>
-                      <span className="text-white/80">Minimal Effect</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* REMOVED LEGEND - DECLUTTERED UI */}
 
       {/* Loading */}
       {!mapLoaded && (

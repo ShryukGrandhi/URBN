@@ -17,7 +17,7 @@ export function ChatWithMap({ onMapCommand, simulationRunning }: ChatWithMapProp
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "👋 Hi! I can help you visualize policy impacts on the map. Try asking:\n\n• \"Show me traffic on King Street\"\n• \"Add 500 housing units in Mission District\"\n• \"What happens if we remove parking on 16th St?\"\n• \"Highlight the Tenderloin area\""
+      content: "👋 Hi! I can help you visualize policy impacts on the map. Try asking:\n\n• \"Show me traffic on King Street\"\n• \"Add 500 housing units in Mission District\"\n• \"Demolish Salesforce Tower\"\n• \"What happens if we remove parking on 16th St?\"\n• \"Highlight the Tenderloin area\""
     }
   ]);
   const [input, setInput] = useState('');
@@ -91,7 +91,17 @@ export function ChatWithMap({ onMapCommand, simulationRunning }: ChatWithMapProp
           impact: { traffic: -8, business: -15, biking: +45 }
         };
       }
-      // Demolition
+      // Demolition - Salesforce Tower specific
+      else if (lowerInput.includes('salesforce')) {
+        response = `💥 DEMOLISHING SALESFORCE TOWER!\n\n🎬 Watch the building slowly disappear over 10 seconds:\n• Building opacity fading\n• Progress bar showing demolition\n• Final explosion effect\n• Displacement of 6,000 workers\n\nThis is a DRAMATIC visualization of a major building removal!`;
+        mapAction = {
+          type: 'demolish-salesforce',
+          building: 'Salesforce Tower',
+          workers: 6000,
+          animationDuration: 10
+        };
+      }
+      // General demolition
       else if (lowerInput.includes('demolish') || lowerInput.includes('remove building')) {
         const location = extractLocation(userMessage);
         response = `💥 Showing demolition impact ${location ? `in ${location}` : 'for the area'}.\n\nRemoving old structures would affect:\n• ~200 current residents\n• Create space for 450 new units\n• 18-month construction timeline`;
