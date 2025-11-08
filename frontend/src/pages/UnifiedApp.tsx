@@ -50,19 +50,60 @@ export default function UnifiedApp() {
 
     if (simMessages.length > 0) {
       const latestMessage = simMessages[simMessages.length - 1];
+      
+      // Check for results in the message
       if (latestMessage.data.results) {
+        console.log('📊 Simulation results received:', latestMessage.data.results);
         setSimulationResults(latestMessage.data.results);
       }
-      if (latestMessage.data.status === 'completed') {
-        setRunningSimulation(null);
-        refetchProjects(); // Update simulation count
-        alert('✅ Simulation completed successfully!');
+      
+      // Check if completed
+      if (latestMessage.data.type === 'completed' || latestMessage.data.status === 'completed') {
+        console.log('✅ Simulation completed!');
+        
+        // Fetch final results from API
+        simulationsApi.get(runningSimulation).then(res => {
+          console.log('📊 Final simulation data:', res.data);
+          if (res.data.metrics) {
+            setSimulationResults(res.data);
+          }
+        });
+        
+        setTimeout(() => {
+          setRunningSimulation(null);
+          refetchProjects();
+          alert('✅ Simulation completed! Check the map for visual changes!');
+        }, 2000);
       }
     }
   }, [messages, runningSimulation, refetchProjects]);
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const testVisualEffects = () => {
+    // INSTANTLY show visual effects with mock data
+    const mockResults = {
+      metrics: {
+        changes: {
+          housingAffordability: { percentage: 18.5, description: 'Significant improvement in affordable housing' },
+          trafficFlow: { percentage: 12.3, description: 'Reduced congestion due to new transit' },
+          airQuality: { percentage: 15.7, description: 'Improved air quality from reduced vehicle use' },
+          publicTransitUsage: { percentage: 22.1, description: 'Major increase in transit ridership' }
+        }
+      },
+      policyMaker: 'San Francisco City Council',
+      source: 'Affordable Housing Initiative 2025'
+    };
+
+    setSimulationResults(mockResults);
+    scrollToSection('map');
+    
+    // Simulate WebSocket messages
+    setTimeout(() => {
+      alert('🎨 Visual effects test complete! You should see:\n\n🏗️ Green construction markers\n🔥 Colorful heatmap zones\n🛣️ Blue new roads\n😊 Public reactions\n\nThis is TEST DATA to show what the map looks like during a real simulation!');
+    }, 1000);
   };
 
   const startSimulation = async () => {
@@ -452,8 +493,27 @@ export default function UnifiedApp() {
                   Run Simulation
                 </div>
               </button>
+
+              <button
+                onClick={testVisualEffects}
+                className="group relative inline-block"
+              >
+                <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition"></div>
+                <div className="relative bg-black border-2 border-pink-400/50 px-8 py-4 rounded-2xl font-bold text-lg text-white flex items-center gap-3 hover:border-pink-400 transition">
+                  <Activity className="w-6 h-6" />
+                  TEST Visual Effects
+                </div>
+              </button>
             </div>
           )}
+
+          <div className="mt-8 text-center">
+            <div className="inline-block px-6 py-3 bg-purple-500/20 border border-purple-400/30 rounded-xl">
+              <p className="text-purple-200 text-sm">
+                💡 <strong>Pro Tip:</strong> Click "TEST Visual Effects" to instantly see heatmaps, buildings, and animations!
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Scroll to Next */}

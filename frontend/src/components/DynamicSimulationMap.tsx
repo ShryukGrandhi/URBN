@@ -421,34 +421,36 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="absolute inset-0" />
       
-      {/* 3D/2D Toggle Button */}
+      {/* 3D/2D Toggle Button - ALWAYS VISIBLE */}
       <div className="absolute top-8 right-8 z-20 space-y-4">
         <button
           onClick={toggle3D}
           className="group relative"
         >
           <div className={`absolute -inset-1 bg-gradient-to-r ${is3D ? 'from-blue-600 to-cyan-600' : 'from-purple-600 to-pink-600'} rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition`}></div>
-          <div className="relative bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl px-6 py-4 flex items-center gap-3">
-            <div className="text-2xl">{is3D ? '🗺️' : '🏙️'}</div>
+          <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
+            <div className="text-3xl">{is3D ? '🏙️' : '🗺️'}</div>
             <div>
               <p className="text-white font-bold text-lg">{is3D ? '3D View' : '2D View'}</p>
-              <p className="text-white/60 text-xs">Click to toggle</p>
+              <p className="text-white/60 text-xs">Click to switch</p>
             </div>
           </div>
         </button>
 
-        {/* Heatmap Toggle */}
+        {/* Heatmap Toggle - Shows during simulation */}
         {simulationData && (
           <button
             onClick={() => setShowHeatmap(!showHeatmap)}
             className="group relative"
           >
-            <div className={`absolute -inset-1 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition`}></div>
-            <div className="relative bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl px-6 py-4 flex items-center gap-3">
-              <div className="text-2xl">🔥</div>
+            <div className={`absolute -inset-1 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition animate-pulse`}></div>
+            <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
+              <div className="text-3xl">🔥</div>
               <div>
                 <p className="text-white font-bold text-lg">Heatmap</p>
-                <p className="text-white/60 text-xs">{showHeatmap ? 'ON' : 'OFF'}</p>
+                <p className={`text-xs font-bold ${showHeatmap ? 'text-green-400' : 'text-red-400'}`}>
+                  {showHeatmap ? '✅ ON' : '❌ OFF'}
+                </p>
               </div>
             </div>
           </button>
