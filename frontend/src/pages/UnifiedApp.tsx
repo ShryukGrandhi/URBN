@@ -20,6 +20,8 @@ export default function UnifiedApp() {
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedLayers, setSelectedLayers] = useState(['buildings', 'traffic']);
   const [city, setCity] = useState('San Francisco, CA');
+  const [runningSimulation, setRunningSimulation] = useState<string | null>(null);
+  const [simulationResults, setSimulationResults] = useState<any>(null);
 
   const { data: projects, refetch: refetchProjects } = useQuery({
     queryKey: ['projects'],
@@ -39,23 +41,50 @@ export default function UnifiedApp() {
 
   const { messages } = useWebSocket();
 
+  // Listen to WebSocket messages and update simulation results
+  useEffect(() => {
+    if (!runningSimulation) return;
+
+    const simMessages = messages.filter(
+      (m) => m.channel === `simulation:${runningSimulation}`
+    );
+
+    if (simMessages.length > 0) {
+      const latestMessage = simMessages[simMessages.length - 1];
+      if (latestMessage.data.results) {
+        setSimulationResults(latestMessage.data.results);
+      }
+      if (latestMessage.data.status === 'completed') {
+        setRunningSimulation(null);
+      }
+    }
+  }, [messages, runningSimulation]);
+
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const startSimulation = async () => {
     if (!selectedProject) {
-      alert('Select a project first!');
+      alert('⚠️ Please select a project first!');
       return;
     }
     try {
-      await simulationsApi.create({
+      setSimulationResults(null);
+      const response = await simulationsApi.create({
         projectId: selectedProject,
         city,
         timeHorizon: 10
       });
+      setRunningSimulation(response.data.id);
+      
+      // Scroll to map to watch it
+      scrollToSection('map');
+      
+      alert('✅ Simulation started! Scroll to map to watch live updates!');
     } catch (error) {
       console.error('Simulation failed:', error);
+      alert('❌ Simulation failed to start. Check console for details.');
     }
   };
 
@@ -146,9 +175,56 @@ export default function UnifiedApp() {
           <EnhancedMapView
             city={city}
             layers={selectedLayers}
-            simulationData={null}
+            simulationData={simulationResults}
           />
         </div>
+
+        {/* Live Simulation Feed - RIGHT SIDE */}
+        {runningSimulation && (
+          <div className="absolute top-8 right-8 z-20 w-96">
+            <div className="relative">
+              <div className="absolute -inset-1 bg-gradient-to-r from-green-600 via-emerald-600 to-cyan-600 rounded-3xl blur-xl opacity-75 animate-pulse"></div>
+              <div className="relative bg-black/90 backdrop-blur-3xl border border-white/30 rounded-3xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-4 h-4 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-500"></div>
+                  <h3 className="text-white font-bold text-xl">🔬 SIMULATION RUNNING</h3>
+                </div>
+                
+                {/* Live Messages */}
+                <div className="space-y-2 max-h-96 overflow-auto font-mono text-sm">
+                  {messages
+                    .filter((m) => m.channel === `simulation:${runningSimulation}`)
+                    .slice(-15)
+                    .map((msg, i) => (
+                      <div key={i} className="text-green-300 flex items-start gap-2 animate-in fade-in slide-in-from-right duration-300">
+                        <span className="text-green-400 mt-1">▶</span>
+                        <span>{msg.data.message || msg.data.token || 'Processing...'}</span>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Results Preview */}
+                {simulationResults && (
+                  <div className="mt-4 pt-4 border-t border-white/20">
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
+                      📊 Live Metrics
+                    </h4>
+                    <div className="space-y-2">
+                      {simulationResults.metrics && Object.entries(simulationResults.metrics.changes || {}).slice(0, 3).map(([key, value]: [string, any]) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span className="text-white/70 text-sm capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                          <span className={`font-bold ${value.percentage > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {value.percentage > 0 ? '+' : ''}{value.percentage?.toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Floating Controls */}
         <div className="absolute top-8 left-8 z-20 space-y-4">
@@ -412,17 +488,23 @@ export default function UnifiedApp() {
 
       {selectedProject && showAddAgentModal && (
         <AddAgentModal
-          open={showAddAgentModal}
-          onClose={() => setShowAddAgentModal(false)}
           projectId={selectedProject}
+          onClose={() => setShowAddAgentModal(false)}
+          onSuccess={() => {
+            setShowAddAgentModal(false);
+            alert('✅ Agents added to project successfully!');
+          }}
         />
       )}
 
       {selectedProject && showUploadModal && (
         <UploadPolicyModal
-          open={showUploadModal}
-          onClose={() => setShowUploadModal(false)}
           projectId={selectedProject}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => {
+            setShowUploadModal(false);
+            alert('✅ Policy document uploaded successfully!');
+          }}
         />
       )}
     </div>
