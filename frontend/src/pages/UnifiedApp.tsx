@@ -5,6 +5,7 @@ import {
   Activity, TrendingUp, FileText, MessageSquare, BarChart3
 } from 'lucide-react';
 import { DynamicSimulationMap } from '../components/DynamicSimulationMap';
+import { ChatWithMap } from '../components/ChatWithMap';
 import { CreateProjectModal } from '../components/CreateProjectModal';
 import { CreateAgentModal } from '../components/CreateAgentModal';
 import { AddAgentModal } from '../components/AddAgentModal';
@@ -21,6 +22,7 @@ export default function UnifiedApp() {
   const [city, setCity] = useState('San Francisco, CA');
   const [runningSimulation, setRunningSimulation] = useState<string | null>(null);
   const [simulationResults, setSimulationResults] = useState<any>(null);
+  const [chatMapCommands, setChatMapCommands] = useState<any[]>([]);
 
   const { data: projects, refetch: refetchProjects } = useQuery({
     queryKey: ['projects'],
@@ -60,13 +62,25 @@ export default function UnifiedApp() {
       // Check if completed
       if (latestMessage.data.type === 'completed' || latestMessage.data.status === 'completed') {
         console.log('✅ Simulation completed!');
+        console.log('📊 Completion data:', latestMessage.data);
         
-        // Fetch final results from API
+        // Set results immediately from WebSocket message
+        if (latestMessage.data.results) {
+          console.log('📊 Setting results from WebSocket:', latestMessage.data.results);
+          setSimulationResults({
+            ...latestMessage.data.results,
+            metrics: latestMessage.data.metrics || latestMessage.data.results.metrics
+          });
+        }
+        
+        // Also fetch final results from API as backup
         simulationsApi.get(runningSimulation).then(res => {
-          console.log('📊 Final simulation data:', res.data);
+          console.log('📊 Final simulation data from API:', res.data);
           if (res.data.metrics) {
             setSimulationResults(res.data);
           }
+        }).catch(err => {
+          console.error('Failed to fetch simulation results:', err);
         });
         
         setTimeout(() => {
@@ -80,6 +94,60 @@ export default function UnifiedApp() {
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleMapCommand = (command: any) => {
+    console.log('🗺️ Map command received:', command);
+    
+    // Create instant visual update based on command
+    const instantUpdate: any = {
+      metrics: {
+        changes: {}
+      }
+    };
+
+    switch (command.type) {
+      case 'add-housing':
+        instantUpdate.metrics.changes.housingAffordability = {
+          percentage: command.impact || 15,
+          description: `Adding ${command.units} units in ${command.location}`
+        };
+        instantUpdate.chatCommand = command;
+        break;
+      
+      case 'highlight-roads':
+        instantUpdate.metrics.changes.trafficFlow = {
+          percentage: 10,
+          description: `Analyzing ${command.target}`
+        };
+        instantUpdate.chatCommand = command;
+        break;
+      
+      case 'highlight-area':
+        instantUpdate.metrics.changes.focus = {
+          percentage: 100,
+          description: `Highlighting ${command.location}`
+        };
+        instantUpdate.chatCommand = command;
+        break;
+      
+      case 'show-heatmap':
+        // Just refresh the current data to trigger heatmap
+        if (simulationResults) {
+          setSimulationResults({...simulationResults});
+        }
+        return;
+      
+      default:
+        instantUpdate.chatCommand = command;
+    }
+
+    // Update map with chat-driven results
+    setSimulationResults(instantUpdate);
+    setChatMapCommands(prev => [...prev, command]);
+    
+    // Scroll to map to see changes
+    scrollToSection('map');
   };
 
   const testVisualEffects = () => {
@@ -660,6 +728,12 @@ export default function UnifiedApp() {
           }}
         />
       )}
+
+      {/* Chat with Map - Always Available */}
+      <ChatWithMap
+        onMapCommand={handleMapCommand}
+        simulationRunning={!!runningSimulation}
+      />
     </div>
   );
 }

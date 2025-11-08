@@ -65,11 +65,13 @@ export async function runSimulation(simulationId: string) {
       },
     });
 
-    // Broadcast completion
+    // Broadcast completion with full data
     broadcastToChannel(`simulation:${simulationId}`, {
       type: 'completed',
       simulationId,
       results,
+      metrics: results.metrics,
+      status: 'completed'
     });
 
     return results;
