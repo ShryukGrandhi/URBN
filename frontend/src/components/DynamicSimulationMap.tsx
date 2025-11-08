@@ -34,7 +34,7 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/standard',
+      style: 'mapbox://styles/mapbox/dark-v11',  // DARK - Full control over buildings!
       center: [-122.4194, 37.7749],
       zoom: 15,
       pitch: 70,
@@ -47,6 +47,39 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
 
     map.current.on('load', () => {
       setMapLoaded(true);
+      
+      if (!map.current) return;
+
+      // Add custom 3D buildings layer that WE CAN CONTROL
+      map.current.addLayer({
+        'id': '3d-buildings',
+        'source': 'composite',
+        'source-layer': 'building',
+        'filter': ['==', 'extrude', 'true'],
+        'type': 'fill-extrusion',
+        'minzoom': 14,
+        'paint': {
+          'fill-extrusion-color': '#aaa',
+          'fill-extrusion-height': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            15, 0,
+            15.05,
+            ['get', 'height']
+          ],
+          'fill-extrusion-base': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            15, 0,
+            15.05,
+            ['get', 'min_height']
+          ],
+          'fill-extrusion-opacity': 0.8,
+          'fill-extrusion-vertical-gradient': true
+        }
+      });
     });
 
     return () => {
