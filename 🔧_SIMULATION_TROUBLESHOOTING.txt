@@ -1,0 +1,287 @@
+🔧 SIMULATION TROUBLESHOOTING GUIDE
+===================================
+
+## ❌ ERROR: "Simulation failed: AxiosError"
+## 🔴 Status: 500 (Internal Server Error)
+
+---
+
+## 🎯 MOST COMMON CAUSES:
+
+### **1. NO AGENTS ASSIGNED TO PROJECT** ⚠️
+**Solution:**
+1. Select your project
+2. Click "Add Agents" button
+3. Click "Select Recommended" (adds all 5 agents)
+4. OR manually select agents
+5. Click "Add Selected Agents"
+6. Try simulation again
+
+### **2. BACKEND NOT RUNNING** 🔴
+**Check:**
+```bash
+# Is backend running?
+# You should see it in terminal [0]
+```
+
+**If not running:**
+```bash
+npm run dev
+```
+
+### **3. DATABASE NOT CONNECTED** 💾
+**Check:**
+```bash
+# Are Docker containers running?
+docker ps
+
+# Should see:
+# - PostgreSQL on port 5432
+# - Redis on port 6379
+```
+
+**If not running:**
+```bash
+docker-compose up -d
+```
+
+### **4. GEMINI API KEY MISSING** 🤖
+**Check backend/.env:**
+```env
+GEMINI_API_KEY=AIzaSyDaS8rk8Yjkch6SH6q68v0rBXc9CTZtFuo
+```
+
+**If missing, add it and restart backend:**
+```bash
+# Stop: Ctrl+C
+# Start: npm run dev
+```
+
+---
+
+## 📋 STEP-BY-STEP FIX:
+
+### **STEP 1: Check Backend Terminal**
+Look for error messages in the backend terminal (usually [0]).
+
+Common errors:
+```
+❌ "No agent found"
+❌ "Project not found"  
+❌ "Database connection failed"
+❌ "GoogleGenerativeAIError"
+```
+
+### **STEP 2: Ensure Project Has Agents**
+```
+1. Go to Projects section
+2. Click your project
+3. Look at agent count: "X agents"
+4. If 0 agents:
+   - Click "Add Agents"
+   - Click "Select Recommended"
+   - Click "Add Selected Agents"
+```
+
+### **STEP 3: Check Database**
+```bash
+# Check if Docker is running
+docker ps
+
+# If empty, start containers:
+docker-compose up -d
+
+# Wait 10 seconds for startup
+# Then check again:
+docker ps
+```
+
+### **STEP 4: Restart Backend**
+```bash
+# In backend terminal:
+# Press Ctrl+C to stop
+
+# Then restart:
+npm run dev
+
+# Wait for:
+# ✅ "Server listening at http://0.0.0.0:3001"
+```
+
+### **STEP 5: Try Simulation Again**
+```
+1. Refresh browser (Ctrl+Shift+R)
+2. Scroll to Projects
+3. Select project
+4. Click "Run Simulation"
+5. Watch for success!
+```
+
+---
+
+## 🐛 DEBUG CHECKLIST:
+
+### **Frontend Checklist:**
+- [ ] Browser is at http://localhost:5173
+- [ ] No errors in browser console (F12)
+- [ ] Project is selected (purple ring around it)
+- [ ] Project shows "X agents" where X > 0
+
+### **Backend Checklist:**
+- [ ] Backend running in terminal
+- [ ] Shows: "Server listening at http://0.0.0.0:3001"
+- [ ] No red errors in terminal
+- [ ] Database connected successfully
+
+### **Environment Checklist:**
+- [ ] backend/.env has GEMINI_API_KEY
+- [ ] backend/.env has DATABASE_URL
+- [ ] backend/.env has REDIS_URL
+- [ ] Docker containers are running
+
+---
+
+## 🎯 QUICK FIX (Most Common):
+
+**IF ERROR: "No agent found" or "500 error"**
+
+```
+Solution: Add agents to your project!
+
+Steps:
+1. Scroll to Projects section
+2. Click your project card
+3. Click "Add Agents" button
+4. Click "Select Recommended"
+5. Click "Add Selected Agents"
+6. Now try "Run Simulation" again!
+```
+
+---
+
+## 📊 WHAT BACKEND LOGS SHOULD SHOW:
+
+### **Successful Simulation Start:**
+```
+POST /api/simulations 201
+✅ Simulation created: abc-123
+🔬 Starting simulation agent...
+📡 Broadcasting to channel: simulation:abc-123
+```
+
+### **Failed Simulation (No Agents):**
+```
+POST /api/simulations 500
+❌ Error: No agent found for project
+```
+
+### **Failed Simulation (No Policy):**
+```
+POST /api/simulations 500
+❌ Error: No policy document found
+```
+
+---
+
+## 🔍 DETAILED ERROR MESSAGES:
+
+### **You'll Now See Better Errors:**
+
+**Before:**
+```
+❌ Simulation failed to start. Check console for details.
+```
+
+**Now:**
+```
+❌ Simulation failed to start:
+
+Backend server error. Common causes:
+1. No agents assigned to project
+2. No policy document uploaded
+3. Database connection issue
+4. AI API key missing or invalid
+
+Check backend terminal for detailed error logs.
+```
+
+---
+
+## ✅ VERIFICATION:
+
+### **To Verify Everything Works:**
+
+1. **Check Backend Running:**
+   ```bash
+   curl http://localhost:3001/api/agents
+   # Should return JSON with agents
+   ```
+
+2. **Check Database:**
+   ```bash
+   docker ps | grep postgres
+   # Should show running container
+   ```
+
+3. **Check Frontend:**
+   ```
+   Open http://localhost:5173
+   Should load without errors
+   ```
+
+4. **Test Full Flow:**
+   ```
+   1. Create project
+   2. Add agents (Select Recommended)
+   3. Upload policy (optional)
+   4. Run simulation
+   5. Watch live updates!
+   ```
+
+---
+
+## 🚀 STILL NOT WORKING?
+
+### **Check Backend Terminal for Exact Error:**
+
+Look for lines like:
+```
+❌ Error: ...
+❌ GoogleGenerativeAIError: ...
+❌ Database error: ...
+❌ ECONNREFUSED ...
+```
+
+Then:
+1. Copy the error message
+2. Check what it says
+3. Fix that specific issue
+
+---
+
+## 💡 PRO TIPS:
+
+1. **Always add agents first** - simulations need AI agents!
+2. **Check backend terminal** - real errors show there
+3. **Restart if stuck** - sometimes a restart fixes everything
+4. **Use "Select Recommended"** - easiest way to add all agents
+5. **Wait for backend startup** - give it 5-10 seconds after restart
+
+---
+
+## 📞 COMMON FIXES:
+
+| Error | Fix |
+|-------|-----|
+| 500 Internal Server Error | Add agents to project |
+| Cannot connect | Start backend server |
+| Database error | Start Docker containers |
+| API key error | Check GEMINI_API_KEY in .env |
+| No agent found | Add agents via "Add Agents" button |
+
+---
+
+**TRY THE QUICK FIX FIRST: Add agents to your project!** 🎯
+
+Most simulation failures are because no agents are assigned!
+

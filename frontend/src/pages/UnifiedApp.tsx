@@ -4,7 +4,7 @@ import {
   ChevronDown, MapPin, Zap, Users, Play, Upload, 
   Activity, TrendingUp, FileText, MessageSquare, BarChart3
 } from 'lucide-react';
-import { EnhancedMapView } from '../components/EnhancedMapView';
+import { DynamicSimulationMap } from '../components/DynamicSimulationMap';
 import { CreateProjectModal } from '../components/CreateProjectModal';
 import { CreateAgentModal } from '../components/CreateAgentModal';
 import { AddAgentModal } from '../components/AddAgentModal';
@@ -18,7 +18,6 @@ export default function UnifiedApp() {
   const [showAddAgentModal, setShowAddAgentModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string>('');
-  const [selectedLayers, setSelectedLayers] = useState(['buildings', 'traffic']);
   const [city, setCity] = useState('San Francisco, CA');
   const [runningSimulation, setRunningSimulation] = useState<string | null>(null);
   const [simulationResults, setSimulationResults] = useState<any>(null);
@@ -56,9 +55,11 @@ export default function UnifiedApp() {
       }
       if (latestMessage.data.status === 'completed') {
         setRunningSimulation(null);
+        refetchProjects(); // Update simulation count
+        alert('✅ Simulation completed successfully!');
       }
     }
-  }, [messages, runningSimulation]);
+  }, [messages, runningSimulation, refetchProjects]);
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -69,22 +70,63 @@ export default function UnifiedApp() {
       alert('⚠️ Please select a project first!');
       return;
     }
+    
+    // Fetch project agents
     try {
+      const projectAgentsRes = await projectsApi.get(selectedProject);
+      const projectAgents = projectAgentsRes.data.agents || [];
+      
+      if (projectAgents.length === 0) {
+        alert('⚠️ No agents assigned to this project!\n\nClick "Add Agents" to assign AI agents first.');
+        return;
+      }
+      
+      // Pick first SIMULATION agent, or fallback to first agent
+      const simulationAgent = projectAgents.find((pa: any) => pa.agent.type === 'SIMULATION');
+      const agentToUse = simulationAgent?.agent || projectAgents[0]?.agent;
+      
+      if (!agentToUse) {
+        alert('⚠️ No valid agent found!');
+        return;
+      }
+      
       setSimulationResults(null);
       const response = await simulationsApi.create({
         projectId: selectedProject,
+        agentId: agentToUse.id,
         city,
-        timeHorizon: 10
+        parameters: {
+          timeHorizon: 10,
+          focusAreas: [],
+          analysisDepth: 'detailed'
+        }
       });
       setRunningSimulation(response.data.id);
       
       // Scroll to map to watch it
       scrollToSection('map');
       
-      alert('✅ Simulation started! Scroll to map to watch live updates!');
-    } catch (error) {
+      alert('✅ Simulation started! Watch the map for live updates!');
+    } catch (error: any) {
       console.error('Simulation failed:', error);
-      alert('❌ Simulation failed to start. Check console for details.');
+      
+      let errorMessage = '❌ Simulation failed:\n\n';
+      
+      if (error.response?.status === 500) {
+        errorMessage += 'Server Error. Check:\n';
+        errorMessage += '1. Backend is running\n';
+        errorMessage += '2. Database is connected\n';
+        errorMessage += '3. GEMINI_API_KEY is valid\n\n';
+        errorMessage += 'Error: ' + (error.response?.data?.message || 'Unknown');
+      } else if (error.response?.status === 404) {
+        errorMessage += 'Project or agent not found.';
+      } else if (!error.response) {
+        errorMessage += 'Cannot connect to backend.\nMake sure backend is running on http://localhost:3001';
+      } else {
+        errorMessage += error.response?.data?.message || error.message || 'Unknown error';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -172,10 +214,11 @@ export default function UnifiedApp() {
       {/* SECTION 2: FULL-SCREEN MAP */}
       <section id="map" className="relative h-screen">
         <div className="absolute inset-0">
-          <EnhancedMapView
+          <DynamicSimulationMap
             city={city}
-            layers={selectedLayers}
             simulationData={simulationResults}
+            messages={messages}
+            simulationId={runningSimulation}
           />
         </div>
 
@@ -190,8 +233,14 @@ export default function UnifiedApp() {
                   <h3 className="text-white font-bold text-xl">🔬 SIMULATION RUNNING</h3>
                 </div>
                 
+                <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
+                  <p className="text-yellow-200 text-sm font-semibold">
+                    💡 Watch the map change in real-time as impacts are calculated!
+                  </p>
+                </div>
+                
                 {/* Live Messages */}
-                <div className="space-y-2 max-h-96 overflow-auto font-mono text-sm">
+                <div className="space-y-2 max-h-64 overflow-auto font-mono text-sm">
                   {messages
                     .filter((m) => m.channel === `simulation:${runningSimulation}`)
                     .slice(-15)
@@ -203,21 +252,46 @@ export default function UnifiedApp() {
                     ))}
                 </div>
 
-                {/* Results Preview */}
+                {/* Results Preview with VISUAL INDICATORS */}
                 {simulationResults && (
                   <div className="mt-4 pt-4 border-t border-white/20">
-                    <h4 className="text-white font-bold mb-2 flex items-center gap-2">
-                      📊 Live Metrics
+                    <h4 className="text-white font-bold mb-3 flex items-center gap-2">
+                      📊 Live Impact on Map
                     </h4>
-                    <div className="space-y-2">
-                      {simulationResults.metrics && Object.entries(simulationResults.metrics.changes || {}).slice(0, 3).map(([key, value]: [string, any]) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <span className="text-white/70 text-sm capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                          <span className={`font-bold ${value.percentage > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {value.percentage > 0 ? '+' : ''}{value.percentage?.toFixed(1)}%
-                          </span>
+                    <div className="space-y-3">
+                      {simulationResults.metrics && Object.entries(simulationResults.metrics.changes || {}).map(([key, value]: [string, any]) => (
+                        <div key={key} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-white/70 text-sm capitalize flex items-center gap-2">
+                              {key === 'housingAffordability' && '🏠'}
+                              {key === 'trafficFlow' && '🚗'}
+                              {key === 'airQuality' && '🌱'}
+                              {key === 'publicTransitUsage' && '🚇'}
+                              {key.replace(/([A-Z])/g, ' $1')}
+                            </span>
+                            <span className={`font-bold text-lg ${value.percentage > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {value.percentage > 0 ? '+' : ''}{value.percentage?.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="relative h-2 bg-black/40 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ${
+                                value.percentage > 0 ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'bg-gradient-to-r from-red-500 to-orange-400'
+                              }`}
+                              style={{ 
+                                width: `${Math.min(Math.abs(value.percentage), 100)}%`,
+                                boxShadow: value.percentage > 0 ? '0 0 10px rgba(34, 197, 94, 0.5)' : '0 0 10px rgba(239, 68, 68, 0.5)'
+                              }}
+                            />
+                          </div>
                         </div>
                       ))}
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-xl">
+                      <p className="text-blue-200 text-xs font-semibold">
+                        🗺️ Colored zones on map show policy impact areas
+                      </p>
                     </div>
                   </div>
                 )}
@@ -248,34 +322,24 @@ export default function UnifiedApp() {
           <div className="relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur-xl opacity-75"></div>
             <div className="relative bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl p-6">
-              <h3 className="text-white font-bold text-xl mb-4">Layers</h3>
-              <div className="space-y-2">
-                {[
-                  { id: 'buildings', label: '3D Buildings', emoji: '🏢' },
-                  { id: 'traffic', label: 'Traffic', emoji: '🚗' },
-                  { id: 'housing', label: 'Housing', emoji: '🏠' },
-                  { id: 'emissions', label: 'Air Quality', emoji: '🌱' },
-                ].map((layer) => (
-                  <label
-                    key={layer.id}
-                    className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl cursor-pointer transition"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedLayers.includes(layer.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedLayers([...selectedLayers, layer.id]);
-                        } else {
-                          setSelectedLayers(selectedLayers.filter(l => l !== layer.id));
-                        }
-                      }}
-                      className="w-5 h-5"
-                    />
-                    <span className="text-2xl">{layer.emoji}</span>
-                    <span className="text-white font-semibold">{layer.label}</span>
-                  </label>
-                ))}
+              <h3 className="text-white font-bold text-xl mb-4">🎬 Live Simulation</h3>
+              <div className="space-y-3 text-white/80 text-sm">
+                <p className="flex items-center gap-2">
+                  <span className="text-xl">🏗️</span>
+                  New buildings appear
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="text-xl">💥</span>
+                  Demolitions marked
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="text-xl">🛣️</span>
+                  New roads drawn
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="text-xl">😊</span>
+                  Public reactions
+                </p>
               </div>
             </div>
           </div>
@@ -317,22 +381,37 @@ export default function UnifiedApp() {
             {projects?.map((project: any) => (
               <div
                 key={project.id}
-                onClick={() => setSelectedProject(project.id)}
+                onClick={() => {
+                  setSelectedProject(project.id);
+                  refetchProjects(); // Refresh to get latest counts
+                }}
                 className={`group relative cursor-pointer ${
                   selectedProject === project.id ? 'ring-4 ring-purple-500' : ''
                 }`}
               >
                 <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl blur-xl opacity-0 group-hover:opacity-75 transition"></div>
                 <div className="relative bg-black/60 backdrop-blur-xl border border-white/20 rounded-3xl p-8 hover:border-white/40 transition-all">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-4 text-3xl">
-                    📁
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-3xl">
+                      📁
+                    </div>
+                    {selectedProject === project.id && (
+                      <div className="px-3 py-1 bg-purple-500/30 border border-purple-400/50 rounded-full text-purple-300 text-xs font-bold">
+                        SELECTED
+                      </div>
+                    )}
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-2">{project.name}</h3>
-                  <p className="text-white/60 mb-4">{project.description}</p>
-                  <div className="flex items-center gap-4 text-white/50">
-                    <span>{project._count?.agents || 0} agents</span>
-                    <span>•</span>
-                    <span>{project._count?.simulations || 0} sims</span>
+                  <p className="text-white/60 mb-4 line-clamp-2">{project.description}</p>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        (project._count?.agents || 0) > 0 ? 'bg-green-400' : 'bg-red-400'
+                      }`}></div>
+                      <span className="text-white/70 font-semibold">{project._count?.agents || 0} agents</span>
+                    </div>
+                    <span className="text-white/30">•</span>
+                    <span className="text-white/50">{project._count?.simulations || 0} sims</span>
                   </div>
                 </div>
               </div>
@@ -491,6 +570,7 @@ export default function UnifiedApp() {
           projectId={selectedProject}
           onClose={() => setShowAddAgentModal(false)}
           onSuccess={() => {
+            refetchProjects(); // Refresh project list to show updated agent count
             setShowAddAgentModal(false);
             alert('✅ Agents added to project successfully!');
           }}

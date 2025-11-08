@@ -1,0 +1,98 @@
+📄 HOW TO CREATE TEST POLICY PDF
+==================================
+
+## ✅ I created a test policy for you!
+
+**File:** `TEST_POLICY_AFFORDABLE_HOUSING.md`
+
+This is a realistic San Francisco affordable housing policy with:
+- 5 major policy actions
+- Budget details ($2.5B)
+- Timeline (10 years)
+- Success metrics
+- Risk mitigation
+
+---
+
+## 🔄 CONVERT TO PDF (3 OPTIONS):
+
+### **OPTION 1: Quick Online Converter** ⚡ FASTEST
+1. Go to: https://www.markdowntopdf.com/
+2. Open `TEST_POLICY_AFFORDABLE_HOUSING.md` in Notepad
+3. Copy all the text
+4. Paste into the website
+5. Click "Convert to PDF"
+6. Download the PDF
+7. Upload to URBAN!
+
+### **OPTION 2: VS Code** 🎯 EASY
+1. Open `TEST_POLICY_AFFORDABLE_HOUSING.md` in VS Code
+2. Press `Ctrl+Shift+P`
+3. Type "Markdown: Export to PDF"
+4. If not installed, search for "Markdown PDF" extension
+5. Install it, then repeat steps 2-3
+6. PDF saved automatically!
+
+### **OPTION 3: Print to PDF** 📄 SIMPLE
+1. Open `TEST_POLICY_AFFORDABLE_HOUSING.md` in VS Code or any text editor
+2. Press `Ctrl+P` (Print)
+3. Choose "Microsoft Print to PDF" as printer
+4. Click Print
+5. Save as `affordable-housing-policy.pdf`
+6. Done!
+
+---
+
+## 🚀 FASTEST WAY (30 seconds):
+
+1. **Open:** https://www.markdowntopdf.com/
+2. **Copy paste** the content from `TEST_POLICY_AFFORDABLE_HOUSING.md`
+3. **Click** "Convert"
+4. **Download** PDF
+5. **Upload** to URBAN
+6. **Run simulation!**
+
+---
+
+## 📋 TEST WORKFLOW:
+
+Once you have the PDF:
+
+1. ✅ Go to http://localhost:5173
+2. ✅ Scroll to "Your Projects"
+3. ✅ Create or select a project
+4. ✅ Click "Add Agents" → "Select Recommended"
+5. ✅ Click "Upload Policy" → Choose your PDF
+6. ✅ Click "Run Simulation"
+7. ✅ Watch the MAGIC! 🔴
+
+---
+
+## 🎯 WHAT THE AI WILL ANALYZE:
+
+From your policy, the AI will:
+- Extract 5 policy actions
+- Analyze housing impact
+- Simulate traffic changes
+- Calculate cost/benefit
+- Predict demographic shifts
+- Assess air quality effects
+- Generate visual overlays on map
+
+---
+
+## 💡 ALTERNATIVE: USE ANY PDF
+
+You can also test with ANY policy PDF you have:
+- City ordinance
+- Planning document
+- Government proposal
+- Research paper
+- Any text-based PDF
+
+The AI will extract policy actions and simulate impacts!
+
+---
+
+**QUICKEST: Use markdowntopdf.com - takes 30 seconds!** ⚡
+

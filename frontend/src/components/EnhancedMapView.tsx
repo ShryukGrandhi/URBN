@@ -126,6 +126,128 @@ export function EnhancedMapView({ city, layers, simulationData }: EnhancedMapVie
       .catch(console.error);
   }, [city, mapLoaded]);
 
+  // DYNAMICALLY UPDATE MAP BASED ON SIMULATION RESULTS
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !simulationData) return;
+
+    // Remove existing simulation layers
+    ['housing-heatmap', 'traffic-impact', 'equity-zones', 'air-quality'].forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current?.removeLayer(layerId);
+      }
+    });
+
+    ['housing-source', 'impact-source'].forEach(sourceId => {
+      if (map.current?.getSource(sourceId)) {
+        map.current?.removeSource(sourceId);
+      }
+    });
+
+    // ADD DYNAMIC HOUSING DENSITY OVERLAY
+    if (simulationData.metrics?.changes?.housingAffordability) {
+      const impact = simulationData.metrics.changes.housingAffordability.percentage;
+      
+      // Create a circle layer showing housing impact zones
+      map.current.addSource('housing-source', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: map.current.getCenter().toArray()
+              },
+              properties: {
+                impact: impact
+              }
+            }
+          ]
+        }
+      });
+
+      map.current.addLayer({
+        id: 'housing-heatmap',
+        type: 'circle',
+        source: 'housing-source',
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 100,
+            16, 400
+          ],
+          'circle-color': impact > 0 ? '#10b981' : '#ef4444',
+          'circle-opacity': 0.3,
+          'circle-blur': 1
+        }
+      });
+    }
+
+    // ADD DYNAMIC TRAFFIC IMPACT OVERLAY
+    if (simulationData.metrics?.changes?.trafficFlow) {
+      const impact = simulationData.metrics.changes.trafficFlow.percentage;
+      
+      // Highlight roads with traffic changes
+      map.current.addLayer({
+        id: 'traffic-impact',
+        type: 'line',
+        source: 'composite',
+        'source-layer': 'road',
+        filter: ['==', ['get', 'class'], 'primary'],
+        paint: {
+          'line-width': 6,
+          'line-color': impact > 0 ? '#34d399' : '#fbbf24',
+          'line-opacity': 0.7,
+          'line-blur': 2
+        }
+      });
+    }
+
+    // ADD AIR QUALITY ZONES
+    if (simulationData.metrics?.changes?.airQuality) {
+      const impact = simulationData.metrics.changes.airQuality.percentage;
+      
+      map.current.addSource('impact-source', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: map.current.getCenter().toArray()
+              },
+              properties: { impact }
+            }
+          ]
+        }
+      });
+
+      map.current.addLayer({
+        id: 'air-quality',
+        type: 'circle',
+        source: 'impact-source',
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 150,
+            16, 600
+          ],
+          'circle-color': impact > 0 ? '#22c55e' : '#f59e0b',
+          'circle-opacity': 0.2,
+          'circle-blur': 1.5
+        }
+      });
+    }
+
+  }, [simulationData, mapLoaded]);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="flex items-center justify-center h-full bg-gradient-to-br from-red-50 to-orange-50">
