@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Activity } from 'lucide-react';
+import { Activity, Layers } from 'lucide-react';
+import { DetailedAnalysisConsole } from './DetailedAnalysisConsole';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -20,6 +21,7 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
   const [publicSentiment, setPublicSentiment] = useState<any[]>([]);
   const [is3D, setIs3D] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(true);
+  const [heatmapStyle, setHeatmapStyle] = useState<'concentric' | 'radius'>('concentric');
 
   // Initialize map
   useEffect(() => {
@@ -352,28 +354,70 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
       }
     });
 
-    // Add heatmap layers (outer to inner for proper stacking)
-    zones.reverse().forEach((zone, i) => {
+    // Add heatmap layers based on style
+    if (heatmapStyle === 'concentric') {
+      // STYLE 1: Concentric circles (current)
+      zones.reverse().forEach((zone, i) => {
+        map.current!.addLayer({
+          id: `heatmap-${i}`,
+          type: 'circle',
+          source: 'heatmap-source',
+          filter: ['==', ['get', 'radius'], zone.radius],
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, zone.radius / 20,
+              16, zone.radius / 3,
+              20, zone.radius
+            ],
+            'circle-color': zone.color,
+            'circle-opacity': zone.opacity,
+            'circle-blur': 1
+          }
+        });
+      });
+    } else {
+      // STYLE 2: Filled radius heatmap (smooth gradient)
       map.current!.addLayer({
-        id: `heatmap-${i}`,
-        type: 'circle',
+        id: 'heatmap-filled',
+        type: 'heatmap',
         source: 'heatmap-source',
-        filter: ['==', ['get', 'radius'], zone.radius],
         paint: {
-          'circle-radius': [
+          // Heatmap intensity based on zoom
+          'heatmap-intensity': [
             'interpolate',
             ['linear'],
             ['zoom'],
-            10, zone.radius / 20,
-            16, zone.radius / 3,
-            20, zone.radius
+            10, 0.5,
+            16, 1.5
           ],
-          'circle-color': zone.color,
-          'circle-opacity': zone.opacity,
-          'circle-blur': 1
+          // Color ramp from blue to red
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(0, 0, 255, 0)',
+            0.2, colors[3],
+            0.4, colors[2],
+            0.6, colors[1],
+            0.8, colors[0],
+            1, colors[0]
+          ],
+          // Radius of each point
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 50,
+            16, 200
+          ],
+          // Opacity
+          'heatmap-opacity': 0.7
         }
       });
-    });
+    }
 
     // Add POLICY MAKER ATTRIBUTION ZONE (who made this policy)
     if (simulationData.policyMaker || simulationData.source) {
@@ -404,7 +448,36 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
       setConstructionMarkers(prev => [...prev, makerMarker]);
     }
 
-  }, [simulationData, mapLoaded, showHeatmap]);
+  }, [simulationData, mapLoaded, showHeatmap, heatmapStyle]);
+
+  // Zoom to specific location
+  const zoomToLocation = (location: { lng: number; lat: number; zoom: number; label: string }) => {
+    if (!map.current) return;
+    
+    map.current.flyTo({
+      center: [location.lng, location.lat],
+      zoom: location.zoom,
+      pitch: 70,
+      bearing: -17,
+      duration: 2000,
+      essential: true
+    });
+
+    // Add temporary marker at location
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div class="relative animate-ping">
+        <div class="w-16 h-16 bg-cyan-500 rounded-full opacity-75"></div>
+      </div>
+    `;
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([location.lng, location.lat])
+      .addTo(map.current);
+
+    // Remove after 3 seconds
+    setTimeout(() => marker.remove(), 3000);
+  };
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -439,23 +512,52 @@ export function DynamicSimulationMap({ city, simulationData, messages, simulatio
 
         {/* Heatmap Toggle - Shows during simulation */}
         {simulationData && (
-          <button
-            onClick={() => setShowHeatmap(!showHeatmap)}
-            className="group relative"
-          >
-            <div className={`absolute -inset-1 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition animate-pulse`}></div>
-            <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
-              <div className="text-3xl">🔥</div>
-              <div>
-                <p className="text-white font-bold text-lg">Heatmap</p>
-                <p className={`text-xs font-bold ${showHeatmap ? 'text-green-400' : 'text-red-400'}`}>
-                  {showHeatmap ? '✅ ON' : '❌ OFF'}
-                </p>
+          <>
+            <button
+              onClick={() => setShowHeatmap(!showHeatmap)}
+              className="group relative"
+            >
+              <div className={`absolute -inset-1 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition animate-pulse`}></div>
+              <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
+                <div className="text-3xl">🔥</div>
+                <div>
+                  <p className="text-white font-bold text-lg">Heatmap</p>
+                  <p className={`text-xs font-bold ${showHeatmap ? 'text-green-400' : 'text-red-400'}`}>
+                    {showHeatmap ? '✅ ON' : '❌ OFF'}
+                  </p>
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+
+            {/* Heatmap Style Toggle */}
+            {showHeatmap && (
+              <button
+                onClick={() => setHeatmapStyle(heatmapStyle === 'concentric' ? 'radius' : 'concentric')}
+                className="group relative"
+              >
+                <div className="absolute -inset-1 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition"></div>
+                <div className="relative bg-black/90 backdrop-blur-3xl border-2 border-white/30 rounded-2xl px-6 py-4 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer shadow-2xl">
+                  <div className="text-3xl">{heatmapStyle === 'concentric' ? '⭕' : '🌊'}</div>
+                  <div>
+                    <p className="text-white font-bold text-lg">Style</p>
+                    <p className="text-white/60 text-xs">
+                      {heatmapStyle === 'concentric' ? 'Circles' : 'Gradient'}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            )}
+          </>
         )}
       </div>
+      
+      {/* Detailed Analysis Console */}
+      {simulationData && (
+        <DetailedAnalysisConsole
+          simulationData={simulationData}
+          onZoomTo={zoomToLocation}
+        />
+      )}
       
       {/* Simulation Legend */}
       {simulationData && (

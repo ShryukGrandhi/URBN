@@ -94,16 +94,29 @@ export default function UnifiedApp() {
         }
       },
       policyMaker: 'San Francisco City Council',
-      source: 'Affordable Housing Initiative 2025'
+      source: 'Affordable Housing Initiative 2025',
+      detailedBreakdown: {
+        specificLocations: [
+          'Mission District @ 16th St BART',
+          'SOMA @ 3rd & King',
+          'Treasure Island',
+          'Tenderloin',
+          'Financial District'
+        ],
+        affectedRoads: ['16th Street', 'King Street', '3rd Street', 'Bay Bridge'],
+        bottlenecks: ['King St @ 4th St intersection', 'Bay Bridge westbound']
+      }
     };
 
     setSimulationResults(mockResults);
+    setRunningSimulation('test-simulation-' + Date.now());
     scrollToSection('map');
     
     // Simulate WebSocket messages
     setTimeout(() => {
-      alert('🎨 Visual effects test complete! You should see:\n\n🏗️ Green construction markers\n🔥 Colorful heatmap zones\n🛣️ Blue new roads\n😊 Public reactions\n\nThis is TEST DATA to show what the map looks like during a real simulation!');
-    }, 1000);
+      console.log('📊 TEST: Visual effects activated!');
+      console.log('🎯 Detailed breakdown:', mockResults.detailedBreakdown);
+    }, 500);
   };
 
   const startSimulation = async () => {
