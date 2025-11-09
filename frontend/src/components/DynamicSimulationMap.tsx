@@ -4,7 +4,7 @@ import { Activity, Layers } from 'lucide-react';
 import { DetailedAnalysisConsole } from './DetailedAnalysisConsole';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const MAPBOX_TOKEN = 'pk.eyJ1Ijoic3RldmVkdXN0eSIsImEiOiJjbWd4am05Z2IxZXhyMmtwdTg1cnU4cmYxIn0.zpfFRf-6xH6ivorwg_ZJ3w';
 
 interface DynamicSimulationMapProps {
   city: string;
